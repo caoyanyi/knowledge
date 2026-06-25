@@ -3,6 +3,9 @@
 require_once dirname(__DIR__) . '/src/app_helper.php';
 require_once dirname(__DIR__) . '/src/knowledge_helper.php';
 
+/**
+ * 输出命令行帮助。
+ */
 function printUsage(): void
 {
     echo "用法：\n";
@@ -10,6 +13,9 @@ function printUsage(): void
     echo "  php bin/qdrant_cli.php sync   将 MySQL 知识片段同步到 Qdrant\n";
 }
 
+/**
+ * 初始化 Qdrant collection，适合首次部署或向量维度配置变更后执行。
+ */
 function runQdrantInit(array $env): void
 {
     $response = createQdrantCollection($env);
@@ -18,6 +24,9 @@ function runQdrantInit(array $env): void
     echo $response['body'] . "\n";
 }
 
+/**
+ * 将 MySQL 已保存的知识片段批量同步到 Qdrant。
+ */
 function runQdrantSync(array $env): void
 {
     $pdo = createPdo($env);
@@ -31,6 +40,7 @@ function runQdrantSync(array $env): void
     $batchSize = envInt($env, 'QDRANT_UPSERT_BATCH_SIZE', 64, 1);
     $syncedCount = 0;
 
+    // 按批次写入 Qdrant，避免一次性提交过多 points 导致请求超时。
     foreach ($rows as $row) {
         echo "生成向量：#{$row['id']} {$row['title']}\n";
 
@@ -56,6 +66,9 @@ function runQdrantSync(array $env): void
     echo "同步完成，共 {$syncedCount} 条知识片段。\n";
 }
 
+/**
+ * 写入一批 Qdrant points，并返回本批成功提交数量。
+ */
 function flushQdrantBatch(array $env, array $points): int
 {
     $response = upsertQdrantPoints($env, $points);

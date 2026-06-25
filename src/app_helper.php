@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * 读取项目配置，默认从项目根目录的 .env 加载。
+ */
 function loadEnv(?string $path = null): array
 {
     $envPath = $path ?? dirname(__DIR__) . '/.env';
@@ -17,11 +20,17 @@ function loadEnv(?string $path = null): array
     return $env;
 }
 
+/**
+ * 读取字符串配置，统一做 trim，避免空格影响后续判断。
+ */
 function envString(array $env, string $key, string $default = ''): string
 {
     return trim((string) ($env[$key] ?? $default));
 }
 
+/**
+ * 读取整数配置，并通过最小值约束过滤明显不合法的配置。
+ */
 function envInt(array $env, string $key, int $default, int $min = 0): int
 {
     $value = (int) ($env[$key] ?? $default);
@@ -29,6 +38,9 @@ function envInt(array $env, string $key, int $default, int $min = 0): int
     return max($min, $value);
 }
 
+/**
+ * 读取浮点数配置，常用于阈值、相似度这类可调参数。
+ */
 function envFloat(array $env, string $key, float $default, float $min = 0.0): float
 {
     $value = (float) ($env[$key] ?? $default);
@@ -36,6 +48,9 @@ function envFloat(array $env, string $key, float $default, float $min = 0.0): fl
     return max($min, $value);
 }
 
+/**
+ * 兼容常见布尔配置写法，例如 true/1/yes/on。
+ */
 function envBool(array $env, string $key, bool $default = false): bool
 {
     $value = strtolower(envString($env, $key, $default ? 'true' : 'false'));
@@ -43,6 +58,9 @@ function envBool(array $env, string $key, bool $default = false): bool
     return in_array($value, ['1', 'true', 'yes', 'on'], true);
 }
 
+/**
+ * 校验接口调用必须依赖的配置项，缺失时给出明确提示。
+ */
 function requireEnvKeys(array $env, array $keys): void
 {
     $missing = [];
@@ -58,6 +76,9 @@ function requireEnvKeys(array $env, array $keys): void
     }
 }
 
+/**
+ * 返回统一 JSON 响应，并在输出后结束当前请求。
+ */
 function sendJson(array $payload, int $statusCode = 200): void
 {
     http_response_code($statusCode);
@@ -66,6 +87,9 @@ function sendJson(array $payload, int $statusCode = 200): void
     exit;
 }
 
+/**
+ * 返回统一错误结构，方便前端用 ok/error 字段处理失败状态。
+ */
 function sendJsonError(string $message, int $statusCode = 500, array $extra = []): void
 {
     sendJson(array_merge([
@@ -74,6 +98,9 @@ function sendJsonError(string $message, int $statusCode = 500, array $extra = []
     ], $extra), $statusCode);
 }
 
+/**
+ * 解析 JSON 请求体；空请求体按空数组处理，便于 GET/空 POST 复用。
+ */
 function readJsonBody(): array
 {
     $rawBody = file_get_contents('php://input');
@@ -87,16 +114,25 @@ function readJsonBody(): array
     return is_array($body) ? $body : [];
 }
 
+/**
+ * 清洗会话 ID，避免用户输入进入 SQL 或路径相关逻辑。
+ */
 function sanitizeSessionId(string $sessionId): string
 {
     return substr(preg_replace('/[^a-zA-Z0-9_\-]/', '', $sessionId), 0, 64);
 }
 
+/**
+ * 创建浏览器会话使用的随机会话 ID。
+ */
 function createSessionId(): string
 {
     return 'sess_' . bin2hex(random_bytes(16));
 }
 
+/**
+ * 创建 MySQL 连接；非必需场景下失败可返回 null，让问答流程继续执行。
+ */
 function createPdo(array $env, bool $required = true): ?PDO
 {
     $dbHost = envString($env, 'DB_HOST', '127.0.0.1');
@@ -132,6 +168,9 @@ function createPdo(array $env, bool $required = true): ?PDO
     }
 }
 
+/**
+ * 将可配置的服务根地址规范化为 /v1/{resource} 接口地址。
+ */
 function normalizeApiEndpoint(string $baseUrl, string $resource): string
 {
     $baseUrl = rtrim($baseUrl, '/');
@@ -144,6 +183,9 @@ function normalizeApiEndpoint(string $baseUrl, string $resource): string
     return $baseUrl . '/v1/' . $resource;
 }
 
+/**
+ * 发送 JSON HTTP 请求，封装 cURL 错误、HTTP 状态码和 JSON 解析结果。
+ */
 function requestJson(string $method, string $url, array $payload, array $headers = [], int $timeout = 60): array
 {
     $ch = curl_init($url);
@@ -193,11 +235,17 @@ function requestJson(string $method, string $url, array $payload, array $headers
     ];
 }
 
+/**
+ * 模型默认系统指令，约束回答优先基于企业知识库。
+ */
 function defaultAssistantInstructions(): string
 {
     return '你是企业AI知识库客服助手。必须优先基于提供的企业资料回答。资料不足时要明确说明“当前知识库资料不足，建议补充相关资料”，不要编造企业信息。回答简洁清晰。';
 }
 
+/**
+ * 获取 OpenAI-compatible Responses API 地址。
+ */
 function openAiResponsesEndpoint(array $env): string
 {
     $baseUrl = envString($env, 'OPENAI_BASE_URL', 'https://api.openai.com');
@@ -205,6 +253,9 @@ function openAiResponsesEndpoint(array $env): string
     return normalizeApiEndpoint($baseUrl, 'responses');
 }
 
+/**
+ * 构造模型请求头，流式请求时额外声明接收 SSE。
+ */
 function openAiRequestHeaders(array $env, bool $stream = false): array
 {
     requireEnvKeys($env, ['OPENAI_API_KEY', 'OPENAI_MODEL']);
@@ -220,6 +271,9 @@ function openAiRequestHeaders(array $env, bool $stream = false): array
     return $headers;
 }
 
+/**
+ * 构造 Responses API 请求体，支持普通文本输入和多轮 messages 输入。
+ */
 function buildResponsesPayload(array $env, array|string $input, bool $stream = false): array
 {
     requireEnvKeys($env, ['OPENAI_API_KEY', 'OPENAI_MODEL']);
@@ -238,6 +292,9 @@ function buildResponsesPayload(array $env, array|string $input, bool $stream = f
     return $payload;
 }
 
+/**
+ * 调用非流式模型接口，返回解析后的 JSON 数据。
+ */
 function callOpenAiResponse(array $env, array $payload): array
 {
     $timeout = envInt($env, 'OPENAI_TIMEOUT_SECONDS', 60, 1);
@@ -252,12 +309,15 @@ function callOpenAiResponse(array $env, array $payload): array
     return $response['json'];
 }
 
+/**
+ * 调用流式模型接口，将每个文本增量交给回调实时输出。
+ */
 function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): void
 {
     $ch = curl_init(openAiResponsesEndpoint($env));
     $buffer = '';
 
-    // OpenAI-compatible Responses API streams Server-Sent Events.
+    // Responses API 使用 SSE；网络分片可能截断事件，所以先缓存到空行分隔符再解析。
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => false,
@@ -314,6 +374,9 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
     curl_close($ch);
 }
 
+/**
+ * 从 Responses API 结果中提取最终文本，兼容 output_text 和 output.content 两种结构。
+ */
 function extractResponseText(array $data): string
 {
     $answer = (string) ($data['output_text'] ?? '');
@@ -333,6 +396,9 @@ function extractResponseText(array $data): string
     return $answer;
 }
 
+/**
+ * 加载最近的多轮上下文，按 user/assistant 交替格式返回给模型。
+ */
 function fetchChatHistory(PDO $pdo, string $sessionId, int $limit): array
 {
     $stmt = $pdo->prepare("
@@ -349,6 +415,7 @@ function fetchChatHistory(PDO $pdo, string $sessionId, int $limit): array
 
     $messages = [];
 
+    // SQL 为了 limit 取最近记录使用倒序，传给模型前恢复为时间正序。
     foreach (array_reverse($stmt->fetchAll()) as $row) {
         $messages[] = [
             'role' => 'user',
@@ -364,6 +431,9 @@ function fetchChatHistory(PDO $pdo, string $sessionId, int $limit): array
     return $messages;
 }
 
+/**
+ * 保存一次问答日志，用于历史会话列表和后续上下文拼接。
+ */
 function saveChatLog(PDO $pdo, string $sessionId, string $message, string $answer, string $model, int $requestTimeMs): void
 {
     $stmt = $pdo->prepare("
@@ -382,6 +452,9 @@ function saveChatLog(PDO $pdo, string $sessionId, string $message, string $answe
     ]);
 }
 
+/**
+ * 获取最近会话摘要，供侧边栏快速恢复历史对话。
+ */
 function fetchRecentSessions(PDO $pdo, int $limit): array
 {
     return $pdo->query("
@@ -398,6 +471,9 @@ function fetchRecentSessions(PDO $pdo, int $limit): array
     ")->fetchAll();
 }
 
+/**
+ * 获取指定会话的完整消息列表。
+ */
 function fetchSessionMessages(PDO $pdo, string $sessionId): array
 {
     $stmt = $pdo->prepare("

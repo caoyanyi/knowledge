@@ -47,3 +47,52 @@
   white-space: pre-wrap;
   font-size: 14px;
 }
+
+.admin-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.chunk-list {
+  margin-top: 16px;
+}
+
+.chunk-item {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.chunk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chunk-meta {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 6px 0;
+}
+
+.chunk-preview {
+  line-height: 1.6;
+  color: #374151;
+}
+
+.chunk-empty {
+  padding: 12px;
+  color: #6b7280;
+}
+
+.delete-btn {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 6px 12px;
+  background: #dc2626;
+  font-size: 13px;
+}

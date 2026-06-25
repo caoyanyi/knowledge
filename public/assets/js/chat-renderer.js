@@ -1,11 +1,17 @@
 const SOURCE_MARKER = '__SOURCES_JSON__:';
 
+/**
+ * 渲染助手 Markdown，并通过 DOMPurify 清理模型输出中的不可信 HTML。
+ */
 function renderMarkdown(text) {
     const html = marked.parse(text);
 
     return DOMPurify.sanitize(html);
 }
 
+/**
+ * 在聊天窗口追加一条消息，并返回气泡节点用于流式更新。
+ */
 function appendMessage(messagesEl, role, text) {
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role}`;
@@ -26,6 +32,9 @@ function appendMessage(messagesEl, role, text) {
     return bubble;
 }
 
+/**
+ * 渲染后端随流式答案返回的知识库来源列表。
+ */
 function renderSources(sources) {
     if (sources.length === 0) {
         return null;
@@ -47,6 +56,9 @@ function renderSources(sources) {
     return sourceBox;
 }
 
+/**
+ * 解析流式响应：正文实时渲染，末尾的来源 JSON 单独显示为参考资料。
+ */
 function renderAssistantStream(bubble, rawStream) {
     let answer = rawStream;
     let sources = [];
@@ -60,6 +72,7 @@ function renderAssistantStream(bubble, rawStream) {
             const parsed = JSON.parse(jsonText);
             sources = parsed.sources || [];
         } catch (error) {
+            // 流还没完整到达时 JSON 可能暂时不完整，下一次 chunk 会重新解析。
             sources = [];
         }
     }

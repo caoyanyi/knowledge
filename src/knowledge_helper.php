@@ -4,6 +4,9 @@ require_once __DIR__ . '/app_helper.php';
 
 const STREAM_SOURCES_MARKER = '__SOURCES_JSON__:';
 
+/**
+ * 将长文本切成适合向量化的片段，并保留少量重叠上下文。
+ */
 function splitTextIntoChunks(string $text, int $maxLength = 800, int $overlap = 100): array
 {
     $text = trim(str_replace(["\r\n", "\r"], "\n", $text));
@@ -62,6 +65,9 @@ function splitTextIntoChunks(string $text, int $maxLength = 800, int $overlap = 
     return array_values(array_filter($chunks));
 }
 
+/**
+ * 调用 embedding 服务生成文本向量。
+ */
 function createEmbedding(array $env, string $text): array
 {
     requireEnvKeys($env, ['EMBEDDING_API_KEY']);
@@ -86,6 +92,9 @@ function createEmbedding(array $env, string $text): array
     return $response['json']['data'][0]['embedding'] ?? [];
 }
 
+/**
+ * 拼出当前 Qdrant collection 的接口地址。
+ */
 function qdrantCollectionUrl(array $env, string $suffix = ''): string
 {
     $qdrantUrl = rtrim(envString($env, 'QDRANT_URL', 'http://127.0.0.1:6333'), '/');
@@ -94,6 +103,9 @@ function qdrantCollectionUrl(array $env, string $suffix = ''): string
     return $qdrantUrl . '/collections/' . rawurlencode($collection) . $suffix;
 }
 
+/**
+ * 创建或更新 Qdrant collection，向量维度和距离算法由 .env 控制。
+ */
 function createQdrantCollection(array $env): array
 {
     $timeout = envInt($env, 'QDRANT_TIMEOUT_SECONDS', 60, 1);
@@ -112,6 +124,9 @@ function createQdrantCollection(array $env): array
     );
 }
 
+/**
+ * 将数据库知识片段转换为 Qdrant points 结构。
+ */
 function buildKnowledgePoint(int $id, string $title, string $content, string $source, array $vector): array
 {
     return [
@@ -126,6 +141,9 @@ function buildKnowledgePoint(int $id, string $title, string $content, string $so
     ];
 }
 
+/**
+ * 批量写入 Qdrant；空数组直接返回成功，方便调用方统一处理。
+ */
 function upsertQdrantPoints(array $env, array $points): array
 {
     if (!$points) {
@@ -149,6 +167,9 @@ function upsertQdrantPoints(array $env, array $points): array
     );
 }
 
+/**
+ * 根据用户问题检索最相关的知识片段。
+ */
 function searchKnowledgeByVector(array $env, string $query, ?int $limit = null): array
 {
     $limit = $limit ?? envInt($env, 'KNOWLEDGE_SEARCH_LIMIT', 3, 1);
@@ -187,6 +208,9 @@ function searchKnowledgeByVector(array $env, string $query, ?int $limit = null):
     }, $response['json']['result'] ?? []);
 }
 
+/**
+ * 为少数容易误召回的问题补充关键词约束。
+ */
 function getRequiredTerms(string $message): array
 {
     if (preg_match('/退款|退费|退货|退订|取消订单/u', $message)) {
@@ -204,6 +228,9 @@ function getRequiredTerms(string $message): array
     return [];
 }
 
+/**
+ * 在开启严格过滤时，剔除与关键业务词不匹配的召回片段。
+ */
 function filterStrongRelatedChunks(array $chunks, string $message): array
 {
     $requiredTerms = getRequiredTerms($message);
@@ -225,6 +252,9 @@ function filterStrongRelatedChunks(array $chunks, string $message): array
     }));
 }
 
+/**
+ * 组织模型可阅读的知识库上下文，并保留前端展示的来源信息。
+ */
 function buildKnowledgeContext(array $env, string $message): array
 {
     $chunks = searchKnowledgeByVector($env, $message);
@@ -236,6 +266,7 @@ function buildKnowledgeContext(array $env, string $message): array
     $context = '';
     $sources = [];
 
+    // 同一份召回结果同时服务提示词和前端“参考资料”，避免重复检索。
     foreach ($chunks as $index => $chunk) {
         $num = $index + 1;
         $score = number_format((float) $chunk['score'], 4);
@@ -258,6 +289,9 @@ function buildKnowledgeContext(array $env, string $message): array
     ];
 }
 
+/**
+ * 根据是否召回知识库内容，生成不同强度的用户提示词。
+ */
 function buildKnowledgePrompt(array $env, string $message, string $knowledgeContext): string
 {
     if ($knowledgeContext !== '') {
@@ -269,4 +303,22 @@ function buildKnowledgePrompt(array $env, string $message, string $knowledgeCont
     $emptyReply = envString($env, 'KNOWLEDGE_EMPTY_REPLY', '当前知识库资料不足，建议补充相关资料');
 
     return "知识库没有检索到与用户问题相关的企业资料。请严格只回答：{$emptyReply}。用户问题：{$message}";
+}
+
+/**
+ * 从 Qdrant 删除对应知识片段，保持向量库与 MySQL 数据一致。
+ */
+function deleteQdrantPoints(array $env, array $ids): array
+{
+    if (!$ids) {
+        return ['status' => 200, 'body' => '', 'json' => []];
+    }
+
+    return requestJson(
+        'POST',
+        qdrantCollectionUrl($env, '/points/delete?wait=true'),
+        ['points' => array_values(array_map('intval', $ids))],
+        [],
+        envInt($env, 'QDRANT_TIMEOUT_SECONDS', 60, 1)
+    );
 }

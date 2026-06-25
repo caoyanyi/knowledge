@@ -3,6 +3,9 @@
 require_once __DIR__ . '/app_helper.php';
 require_once __DIR__ . '/knowledge_helper.php';
 
+/**
+ * 非流式问答接口，主要用于简单调试或不支持 ReadableStream 的场景。
+ */
 function handleChatApi(): void
 {
     try {
@@ -26,6 +29,9 @@ function handleChatApi(): void
     }
 }
 
+/**
+ * 流式问答接口：先拼接知识库上下文和历史对话，再边生成边输出。
+ */
 function handleChatStreamApi(): void
 {
     header('Content-Type: text/plain; charset=utf-8');
@@ -34,6 +40,7 @@ function handleChatStreamApi(): void
 
     set_time_limit(0);
 
+    // 关闭 PHP 输出缓冲，保证模型增量能尽快到达浏览器。
     while (ob_get_level() > 0) {
         ob_end_flush();
     }
@@ -63,6 +70,7 @@ function handleChatStreamApi(): void
         $inputMessages = buildChatInputMessages($env, $message, $knowledge['context'], $historyItems);
         $payload = buildResponsesPayload($env, $inputMessages, true);
 
+        // 文本直接写入响应体，前端会持续重渲染同一个助手气泡。
         streamOpenAiResponse(
             $env,
             $payload,
@@ -77,6 +85,7 @@ function handleChatStreamApi(): void
             }
         );
 
+        // 来源信息放在流末尾，避免混进模型正文导致 Markdown 渲染异常。
         if ($knowledge['sources']) {
             echo "\n" . STREAM_SOURCES_MARKER . json_encode([
                 'sources' => $knowledge['sources'],
@@ -91,6 +100,9 @@ function handleChatStreamApi(): void
     }
 }
 
+/**
+ * 获取最近会话列表。
+ */
 function handleSessionsApi(): void
 {
     try {
@@ -106,6 +118,9 @@ function handleSessionsApi(): void
     }
 }
 
+/**
+ * 获取单个会话下的历史消息。
+ */
 function handleSessionMessagesApi(?string $sessionId = null): void
 {
     try {
@@ -127,6 +142,9 @@ function handleSessionMessagesApi(?string $sessionId = null): void
     }
 }
 
+/**
+ * 新增知识库内容，并同步写入 MySQL 与 Qdrant。
+ */
 function handleCreateKnowledgeChunkApi(): void
 {
     try {
@@ -172,6 +190,9 @@ function handleCreateKnowledgeChunkApi(): void
     }
 }
 
+/**
+ * 安全加载知识库上下文；检索失败不阻断聊天主流程。
+ */
 function loadKnowledgeContextSafely(array $env, string $message): array
 {
     try {
@@ -186,6 +207,9 @@ function loadKnowledgeContextSafely(array $env, string $message): array
     }
 }
 
+/**
+ * 安全加载历史对话；数据库不可用时模型仍可回答当前问题。
+ */
 function loadChatHistorySafely(array $env, ?PDO $pdo, string $sessionId): array
 {
     if (!$pdo || $sessionId === '') {
@@ -199,11 +223,15 @@ function loadChatHistorySafely(array $env, ?PDO $pdo, string $sessionId): array
     }
 }
 
+/**
+ * 将历史消息和知识库增强提示词组合为 Responses API 输入。
+ */
 function buildChatInputMessages(array $env, string $message, string $knowledgeContext, array $historyItems): array
 {
     $userContent = buildKnowledgePrompt($env, $message, $knowledgeContext);
 
     if ($knowledgeContext === '') {
+        // 未检索到资料时不带历史，降低模型受旧上下文影响而编造答案的概率。
         return [
             [
                 'role' => 'user',
@@ -220,6 +248,9 @@ function buildChatInputMessages(array $env, string $message, string $knowledgeCo
     ]);
 }
 
+/**
+ * 保存问答日志；失败时静默处理，避免影响已经返回给用户的流式答案。
+ */
 function saveChatLogSafely(
     array $env,
     ?PDO $pdo,
@@ -246,6 +277,9 @@ function saveChatLogSafely(
     }
 }
 
+/**
+ * 保存切分后的知识片段，并为每个片段生成向量后写入 Qdrant。
+ */
 function saveKnowledgeChunks(array $env, PDO $pdo, string $title, string $source, array $chunks): array
 {
     $insertStmt = $pdo->prepare("
@@ -256,6 +290,7 @@ function saveKnowledgeChunks(array $env, PDO $pdo, string $title, string $source
     $points = [];
     $createdIds = [];
 
+    // MySQL 自增 ID 作为 Qdrant point ID，方便删除和重同步时保持一致。
     foreach ($chunks as $index => $chunkContent) {
         $chunkTitle = count($chunks) > 1
             ? $title . ' - 片段' . ($index + 1)
@@ -279,4 +314,113 @@ function saveKnowledgeChunks(array $env, PDO $pdo, string $title, string $source
     return [
         'ids' => $createdIds,
     ];
+}
+
+/**
+ * 列出最近录入的知识片段，供后台页面管理。
+ */
+function handleListKnowledgeChunksApi(): void
+{
+    try {
+        $env = loadEnv();
+        $pdo = createPdo($env);
+
+        $stmt = $pdo->query("
+            SELECT
+                id,
+                title,
+                source,
+                CHAR_LENGTH(content) AS content_length,
+                LEFT(content, 120) AS preview,
+                created_at
+            FROM knowledge_chunks
+            ORDER BY id DESC
+            LIMIT 100
+        ");
+
+        sendJson([
+            'ok' => true,
+            'items' => $stmt->fetchAll(),
+        ]);
+    } catch (Throwable $e) {
+        sendJsonError($e->getMessage(), 500);
+    }
+}
+
+/**
+ * 删除单条知识片段，并同步删除向量库中的 point。
+ */
+function handleDeleteKnowledgeChunkApi(int $id): void
+{
+    try {
+        if ($id <= 0) {
+            sendJsonError('id 不合法', 400);
+        }
+
+        $env = loadEnv();
+        $pdo = createPdo($env);
+
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare("DELETE FROM knowledge_chunks WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+
+        // 删除向量失败时会抛出异常并回滚 MySQL 删除，保持两边状态一致。
+        deleteQdrantPoints($env, [$id]);
+
+        $pdo->commit();
+
+        sendJson([
+            'ok' => true,
+            'id' => $id,
+            'message' => '知识片段已删除',
+        ]);
+    } catch (Throwable $e) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        sendJsonError($e->getMessage(), 500);
+    }
+}
+
+/**
+ * 将 MySQL 中现有知识片段全量重新写入 Qdrant。
+ */
+function handleSyncKnowledgeChunksApi(): void
+{
+    try {
+        $env = loadEnv();
+        $pdo = createPdo($env);
+
+        $rows = $pdo->query("
+            SELECT id, title, content, source
+            FROM knowledge_chunks
+            ORDER BY id ASC
+        ")->fetchAll();
+
+        $points = [];
+
+        foreach ($rows as $row) {
+            $vector = createEmbedding($env, $row['title'] . "\n" . $row['content']);
+
+            $points[] = buildKnowledgePoint(
+                (int) $row['id'],
+                $row['title'],
+                $row['content'],
+                $row['source'],
+                $vector
+            );
+        }
+
+        upsertQdrantPoints($env, $points);
+
+        sendJson([
+            'ok' => true,
+            'synced_count' => count($points),
+            'message' => '知识库已重新同步到 Qdrant',
+        ]);
+    } catch (Throwable $e) {
+        sendJsonError($e->getMessage(), 500);
+    }
 }

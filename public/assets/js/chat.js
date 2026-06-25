@@ -2,6 +2,9 @@ const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 
+/**
+ * 发送当前输入内容，并用流式响应持续更新助手消息气泡。
+ */
 async function sendMessage() {
     const message = inputEl.value.trim();
 
@@ -39,6 +42,7 @@ async function sendMessage() {
         let answer = '';
         let rawStream = '';
 
+        // 累积完整原始流，便于 renderAssistantStream 识别末尾来源标记。
         while (true) {
             const { value, done } = await reader.read();
 
@@ -65,6 +69,9 @@ async function sendMessage() {
     }
 }
 
+/**
+ * 非流式聊天备用方法，保留给调试或兼容不支持 ReadableStream 的环境。
+ */
 async function sendMessage_all() {
     const message = inputEl.value.trim();
 
@@ -104,6 +111,9 @@ inputEl.addEventListener('keydown', function (event) {
     }
 });
 
+/**
+ * 获取当前浏览器会话 ID，没有则创建一个并持久化到 localStorage。
+ */
 function getSessionId() {
     let sessionId = localStorage.getItem('ai_demo_session_id');
 
@@ -118,6 +128,9 @@ function getSessionId() {
 const newChatBtn = document.getElementById('newChatBtn');
 const sessionListEl = document.getElementById('sessionList');
 
+/**
+ * 重置聊天窗口为初始欢迎语。
+ */
 function resetMessages() {
     messagesEl.innerHTML = `
     <div class="message assistant">
@@ -131,6 +144,9 @@ newChatBtn.addEventListener('click', function () {
     window.location.reload();
 });
 
+/**
+ * 加载最近会话列表，供用户切换历史上下文。
+ */
 async function loadSessions() {
     const data = await ApiClient.listSessions();
 
@@ -152,6 +168,9 @@ async function loadSessions() {
     });
 }
 
+/**
+ * 加载指定会话的历史消息，并把当前会话 ID 切换到该会话。
+ */
 async function loadSessionMessages(targetSessionId) {
     const data = await ApiClient.getSessionMessages(targetSessionId);
 
