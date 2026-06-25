@@ -65,6 +65,8 @@ CHAT_HISTORY_LIMIT=50
 - `KNOWLEDGE_SEARCH_LIMIT`：每次问答检索的知识片段数量
 - `KNOWLEDGE_CHUNK_MAX_LENGTH` / `KNOWLEDGE_CHUNK_OVERLAP`：后台录入知识时的切片大小和重叠长度
 - `QDRANT_VECTOR_SIZE` / `QDRANT_DISTANCE`：Qdrant 集合向量维度和距离算法
+- `EMBEDDING_TIMEOUT_SECONDS` / `QDRANT_TIMEOUT_SECONDS`：问答链路的知识库检索超时；超时后会降级为无参考资料回答，不阻断聊天
+- `QDRANT_UPSERT_TIMEOUT_SECONDS`：后台录入或批量同步知识库时的向量写入超时
 - `CHAT_HISTORY_LIMIT` / `SESSION_LIST_LIMIT`：会话上下文和会话列表数量
 
 ## 数据库表

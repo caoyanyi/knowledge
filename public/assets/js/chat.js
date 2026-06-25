@@ -159,6 +159,8 @@ async function sendMessage() {
                         streamRenderer.append(event.text || '');
                     } else if (event.type === 'sources') {
                         streamRenderer.setSources(event.sources || [], false);
+                    } else if (event.type === 'warning') {
+                        console.warn(event.message || '知识库检索暂时不可用');
                     } else if (event.type === 'error') {
                         streamRenderer.append(`\n[模型错误] ${event.message || '未知错误'}`);
                     }
@@ -176,6 +178,8 @@ async function sendMessage() {
                     streamRenderer.append(event.text || '');
                 } else if (event.type === 'sources') {
                     streamRenderer.setSources(event.sources || [], false);
+                } else if (event.type === 'warning') {
+                    console.warn(event.message || '知识库检索暂时不可用');
                 } else if (event.type === 'error') {
                     streamRenderer.append(`\n[模型错误] ${event.message || '未知错误'}`);
                 }

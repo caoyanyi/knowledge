@@ -17,12 +17,16 @@ function handleChatApi(): void
             sendJsonError('message 不能为空', 400);
         }
 
-        $payload = buildResponsesPayload($env, $message);
+        $knowledge = loadKnowledgeContextSafely($env, $message);
+        $inputMessages = buildChatInputMessages($env, $message, $knowledge['context'], []);
+        $payload = buildResponsesPayload($env, $inputMessages);
         $data = callOpenAiResponse($env, $payload);
 
         sendJson([
             'ok' => true,
             'answer' => extractResponseText($data),
+            'sources' => $knowledge['sources'],
+            'warning' => $knowledge['warning'] ?? '',
         ]);
     } catch (Throwable $e) {
         sendJsonError($e->getMessage(), 500);
@@ -69,6 +73,12 @@ function handleChatStreamApi(): void
         $fullAnswer = '';
         $pdo = createPdo($env, false);
         $knowledge = loadKnowledgeContextSafely($env, $message);
+        if (($knowledge['warning'] ?? '') !== '') {
+            sendStreamEvent('warning', [
+                'message' => $knowledge['warning'],
+            ]);
+        }
+
         $historyItems = loadChatHistorySafely($env, $pdo, $sessionId);
         $inputMessages = buildChatInputMessages($env, $message, $knowledge['context'], $historyItems);
         $payload = buildChatCompletionsPayload($env, $inputMessages, true);
@@ -239,6 +249,7 @@ function loadKnowledgeContextSafely(array $env, string $message): array
             'context' => '',
             'sources' => [],
             'chunks' => [],
+            'warning' => '知识库检索暂时不可用，已切换为无参考资料回答：' . $e->getMessage(),
         ];
     }
 }
