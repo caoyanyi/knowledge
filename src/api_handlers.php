@@ -108,7 +108,7 @@ function handleChatStreamApi(): void
             ]);
         }
 
-        saveChatLogSafely($env, $pdo, $sessionId, $message, $fullAnswer, $startedAt);
+        saveChatLogSafely($env, $pdo, $sessionId, $message, $fullAnswer, $startedAt, $knowledge['sources']);
         sendStreamEvent('done', [
             'session_id' => $sessionId,
         ]);
@@ -293,7 +293,8 @@ function saveChatLogSafely(
     string $sessionId,
     string $message,
     string $answer,
-    float $startedAt
+    float $startedAt,
+    array $sources = []
 ): void {
     if (!$pdo || $answer === '') {
         return;
@@ -306,7 +307,8 @@ function saveChatLogSafely(
             $message,
             $answer,
             envString($env, 'OPENAI_MODEL'),
-            (int) round((microtime(true) - $startedAt) * 1000)
+            (int) round((microtime(true) - $startedAt) * 1000),
+            $sources
         );
     } catch (Throwable $e) {
         // 日志失败不影响已经返回给用户的答案。

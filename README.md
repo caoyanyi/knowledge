@@ -87,10 +87,17 @@ CREATE TABLE chat_logs (
   assistant_answer MEDIUMTEXT NOT NULL,
   model VARCHAR(128) NOT NULL,
   request_time_ms INT UNSIGNED DEFAULT 0,
+  sources_json JSON NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_chat_logs_session_id (session_id),
   INDEX idx_chat_logs_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+已有旧表可执行以下 SQL 手动补充参考资料快照列；应用保存或读取历史消息时也会自动检测并补列：
+
+```sql
+ALTER TABLE chat_logs ADD COLUMN sources_json JSON NULL AFTER request_time_ms;
 ```
 
 向 `knowledge_chunks` 写入企业资料后，可同步到 Qdrant。

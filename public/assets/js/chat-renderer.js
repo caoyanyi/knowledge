@@ -10,7 +10,7 @@ function renderMarkdown(text) {
 /**
  * 在聊天窗口追加一条消息，并返回气泡节点用于流式更新。
  */
-function appendMessage(messagesEl, role, text) {
+function appendMessage(messagesEl, role, text, sources = []) {
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role}`;
 
@@ -18,7 +18,7 @@ function appendMessage(messagesEl, role, text) {
     bubble.className = 'bubble';
 
     if (role === 'assistant') {
-        bubble.innerHTML = renderMarkdown(text);
+        renderAssistantMessage(bubble, text, sources);
     } else {
         bubble.textContent = text;
     }

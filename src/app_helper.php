@@ -539,15 +539,39 @@ function fetchChatHistory(PDO $pdo, string $sessionId, int $limit): array
 }
 
 /**
- * 保存一次问答日志，用于历史会话列表和后续上下文拼接。
+ * 确保聊天日志表具备参考资料快照列，兼容旧数据库直接升级运行。
  */
-function saveChatLog(PDO $pdo, string $sessionId, string $message, string $answer, string $model, int $requestTimeMs): void
+function ensureChatLogSourcesColumn(PDO $pdo): void
 {
+    $stmt = $pdo->query("SHOW COLUMNS FROM chat_logs LIKE 'sources_json'");
+
+    if ($stmt && $stmt->fetch()) {
+        return;
+    }
+
+    $pdo->exec("ALTER TABLE chat_logs ADD COLUMN sources_json JSON NULL AFTER request_time_ms");
+}
+
+/**
+ * 保存一次问答日志，用于历史会话列表、后续上下文拼接和来源追溯。
+ */
+function saveChatLog(
+    PDO $pdo,
+    string $sessionId,
+    string $message,
+    string $answer,
+    string $model,
+    int $requestTimeMs,
+    array $sources = []
+): void
+{
+    ensureChatLogSourcesColumn($pdo);
+
     $stmt = $pdo->prepare("
         INSERT INTO chat_logs
-            (session_id, user_message, assistant_answer, model, request_time_ms)
+            (session_id, user_message, assistant_answer, model, request_time_ms, sources_json)
         VALUES
-            (:session_id, :user_message, :assistant_answer, :model, :request_time_ms)
+            (:session_id, :user_message, :assistant_answer, :model, :request_time_ms, :sources_json)
     ");
 
     $stmt->execute([
@@ -556,6 +580,7 @@ function saveChatLog(PDO $pdo, string $sessionId, string $message, string $answe
         ':assistant_answer' => $answer,
         ':model' => $model,
         ':request_time_ms' => $requestTimeMs,
+        ':sources_json' => $sources ? json_encode($sources, JSON_UNESCAPED_UNICODE) : null,
     ]);
 }
 
@@ -583,8 +608,10 @@ function fetchRecentSessions(PDO $pdo, int $limit): array
  */
 function fetchSessionMessages(PDO $pdo, string $sessionId): array
 {
+    ensureChatLogSourcesColumn($pdo);
+
     $stmt = $pdo->prepare("
-        SELECT user_message, assistant_answer
+        SELECT user_message, assistant_answer, sources_json
         FROM chat_logs
         WHERE session_id = :session_id
         ORDER BY id ASC
@@ -594,5 +621,13 @@ function fetchSessionMessages(PDO $pdo, string $sessionId): array
         ':session_id' => $sessionId,
     ]);
 
-    return $stmt->fetchAll();
+    return array_map(function (array $row) {
+        $sources = json_decode((string) ($row['sources_json'] ?? ''), true);
+
+        return [
+            'user_message' => $row['user_message'],
+            'assistant_answer' => $row['assistant_answer'],
+            'sources' => is_array($sources) ? $sources : [],
+        ];
+    }, $stmt->fetchAll());
 }

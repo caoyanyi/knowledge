@@ -313,7 +313,7 @@ async function loadSessionMessages(targetSessionId) {
 
     data.messages.forEach(row => {
         appendMessage(messagesEl, 'user', row.user_message);
-        appendMessage(messagesEl, 'assistant', row.assistant_answer);
+        appendMessage(messagesEl, 'assistant', row.assistant_answer, row.sources || []);
     });
 }
 
