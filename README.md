@@ -147,8 +147,11 @@ http://127.0.0.1:8000
 - `public/`：前端页面和静态资源
 - `public/index.html`：聊天界面
 - `public/knowledge_admin.html`：知识库录入和同步页面
-- `public/script.js`：前端交互、流式读取、会话切换
-- `public/style.css`：页面样式
+- `public/assets/css/`：基础、聊天页、后台页样式
+- `public/assets/js/api.js`：前端 API 客户端
+- `public/assets/js/chat-renderer.js`：聊天消息和参考资料渲染
+- `public/assets/js/chat.js`：聊天页交互入口
+- `public/assets/js/knowledge-admin.js`：知识库管理页交互入口
 - `src/`：后端 API 和公共方法
 - `src/api.php`：统一 API 路由入口
 - `src/api_handlers.php`：API handler 实现

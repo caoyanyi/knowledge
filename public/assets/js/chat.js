@@ -1,46 +1,6 @@
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
-const SOURCE_MARKER = '__SOURCES_JSON__:';
-
-function addMessage(role, text) {
-    const wrapper = document.createElement('div');
-    wrapper.className = `message ${role}`;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    if (role === 'assistant') {
-        const html = marked.parse(text);
-        bubble.innerHTML = DOMPurify.sanitize(html);
-    } else {
-        bubble.textContent = text;
-    }
-
-    wrapper.appendChild(bubble);
-    messagesEl.appendChild(wrapper);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-function renderSources(sources) {
-    if (sources.length === 0) {
-        return null;
-    }
-
-    const sourceBox = document.createElement('div');
-    sourceBox.className = 'source-box';
-
-    sourceBox.innerHTML = DOMPurify.sanitize(`
-  <div class="source-title">参考资料</div>
-  ${sources.map(item => `
-    <div class="source-item">
-      <span>${item.title}</span>
-      <small>来源：${item.source || '知识库'} · 相关度：${item.score}</small>
-    </div>
-  `).join('')}
-`);
-
-    return sourceBox;
-}
 
 async function sendMessage() {
     const message = inputEl.value.trim();
@@ -49,7 +9,7 @@ async function sendMessage() {
         return;
     }
 
-    addMessage('user', message);
+    appendMessage(messagesEl, 'user', message);
     inputEl.value = '';
     sendBtn.disabled = true;
     sendBtn.textContent = '请求中';
@@ -66,16 +26,7 @@ async function sendMessage() {
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
     try {
-        const response = await fetch('/api/v1/chat/stream', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: message,
-                session_id: sessionId
-            })
-        });
+        const response = await ApiClient.sendChatStream(message, sessionId);
 
         if (!response.ok || !response.body) {
             bubble.textContent = '请求失败：' + response.status;
@@ -87,7 +38,6 @@ async function sendMessage() {
 
         let answer = '';
         let rawStream = '';
-        let sources = [];
 
         while (true) {
             const { value, done } = await reader.read();
@@ -99,31 +49,7 @@ async function sendMessage() {
             const chunk = decoder.decode(value, { stream: true });
             rawStream += chunk;
 
-            const markerIndex = rawStream.indexOf(SOURCE_MARKER);
-
-            if (markerIndex >= 0) {
-                answer = rawStream.slice(0, markerIndex).trim();
-
-                const jsonText = rawStream.slice(markerIndex + SOURCE_MARKER.length).trim();
-
-                try {
-                    const parsed = JSON.parse(jsonText);
-                    sources = parsed.sources || [];
-                } catch (error) {
-                    sources = [];
-                }
-            } else {
-                answer = rawStream;
-            }
-
-            const html = marked.parse(answer);
-            bubble.innerHTML = DOMPurify.sanitize(html);
-
-            const sourceBox = renderSources(sources);
-            if (sourceBox) {
-                bubble.appendChild(sourceBox);
-            }
-
+            answer = renderAssistantStream(bubble, rawStream);
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
@@ -146,32 +72,22 @@ async function sendMessage_all() {
         return;
     }
 
-    addMessage('user', message);
+    appendMessage(messagesEl, 'user', message);
     inputEl.value = '';
     sendBtn.disabled = true;
     sendBtn.textContent = '请求中';
 
     try {
-        const response = await fetch('/api/v1/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: message
-            })
-        });
-
-        const data = await response.json();
+        const data = await ApiClient.sendChat(message);
 
         if (!data.ok) {
-            addMessage('assistant', data.error || '请求失败');
+            appendMessage(messagesEl, 'assistant', data.error || '请求失败');
             return;
         }
 
-        addMessage('assistant', data.answer || '模型没有返回内容');
+        appendMessage(messagesEl, 'assistant', data.answer || '模型没有返回内容');
     } catch (error) {
-        addMessage('assistant', '网络请求失败：' + error.message);
+        appendMessage(messagesEl, 'assistant', '网络请求失败：' + error.message);
     } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = '发送';
@@ -216,8 +132,7 @@ newChatBtn.addEventListener('click', function () {
 });
 
 async function loadSessions() {
-    const response = await fetch('/api/v1/sessions');
-    const data = await response.json();
+    const data = await ApiClient.listSessions();
 
     if (!data.ok) return;
 
@@ -238,8 +153,7 @@ async function loadSessions() {
 }
 
 async function loadSessionMessages(targetSessionId) {
-    const response = await fetch('/api/v1/sessions/' + encodeURIComponent(targetSessionId) + '/messages');
-    const data = await response.json();
+    const data = await ApiClient.getSessionMessages(targetSessionId);
 
     if (!data.ok) return;
 
@@ -249,8 +163,8 @@ async function loadSessionMessages(targetSessionId) {
     messagesEl.innerHTML = '';
 
     data.messages.forEach(row => {
-        addMessage('user', row.user_message);
-        addMessage('assistant', row.assistant_answer);
+        appendMessage(messagesEl, 'user', row.user_message);
+        appendMessage(messagesEl, 'assistant', row.assistant_answer);
     });
 }
 

@@ -1,0 +1,49 @@
+.page {
+  max-width: 860px;
+  margin: 40px auto;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.page h1 {
+  margin: 0 0 20px;
+  font-size: 22px;
+}
+
+.page label {
+  display: block;
+  margin: 16px 0 8px;
+  font-weight: bold;
+}
+
+.page input,
+.page textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 15px;
+  outline: none;
+}
+
+.page textarea {
+  min-height: 220px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.page button {
+  margin-top: 16px;
+  padding: 10px 18px;
+}
+
+.result {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 6px;
+  background: #f9fafb;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
