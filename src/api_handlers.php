@@ -34,7 +34,7 @@ function handleChatApi(): void
  */
 function handleChatStreamApi(): void
 {
-    header('Content-Type: text/plain; charset=utf-8');
+    header('Content-Type: application/x-ndjson; charset=utf-8');
     header('Cache-Control: no-cache');
     header('X-Accel-Buffering: no');
 
@@ -58,7 +58,9 @@ function handleChatStreamApi(): void
 
         if ($message === '') {
             http_response_code(400);
-            echo 'message 不能为空';
+            sendStreamEvent('error', [
+                'message' => 'message 不能为空',
+            ]);
             return;
         }
 
@@ -70,34 +72,62 @@ function handleChatStreamApi(): void
         $inputMessages = buildChatInputMessages($env, $message, $knowledge['context'], $historyItems);
         $payload = buildResponsesPayload($env, $inputMessages, true);
 
-        // 文本直接写入响应体，前端会持续重渲染同一个助手气泡。
-        streamOpenAiResponse(
+        // 文本增量用 NDJSON 事件输出，保证每个流片段都是可解析 JSON。
+        $receivedDelta = streamOpenAiResponse(
             $env,
             $payload,
             function (string $delta) use (&$fullAnswer) {
                 $fullAnswer .= $delta;
-                echo $delta;
-                flush();
+                sendStreamEvent('delta', [
+                    'text' => $delta,
+                ]);
             },
             function (string $message) {
-                echo "\n[模型错误] {$message}";
-                flush();
+                sendStreamEvent('error', [
+                    'message' => $message,
+                ]);
             }
         );
 
-        // 来源信息放在流末尾，避免混进模型正文导致 Markdown 渲染异常。
+        if (!$receivedDelta) {
+            $fallbackPayload = buildResponsesPayload($env, $inputMessages, false);
+            $fallbackAnswer = extractResponseText(callOpenAiResponse($env, $fallbackPayload));
+
+            if ($fallbackAnswer !== '') {
+                $fullAnswer = $fallbackAnswer;
+                sendStreamEvent('delta', [
+                    'text' => $fallbackAnswer,
+                ]);
+            }
+        }
+
         if ($knowledge['sources']) {
-            echo "\n" . STREAM_SOURCES_MARKER . json_encode([
+            sendStreamEvent('sources', [
                 'sources' => $knowledge['sources'],
-            ], JSON_UNESCAPED_UNICODE);
-            flush();
+            ]);
         }
 
         saveChatLogSafely($env, $pdo, $sessionId, $message, $fullAnswer, $startedAt);
+        sendStreamEvent('done', [
+            'session_id' => $sessionId,
+        ]);
     } catch (Throwable $e) {
         http_response_code(500);
-        echo $e->getMessage();
+        sendStreamEvent('error', [
+            'message' => $e->getMessage(),
+        ]);
     }
+}
+
+/**
+ * 输出一行 JSON 流事件，前端和 curl 都可以逐行解析。
+ */
+function sendStreamEvent(string $type, array $payload = []): void
+{
+    echo json_encode(array_merge([
+        'type' => $type,
+    ], $payload), JSON_UNESCAPED_UNICODE) . "\n";
+    flush();
 }
 
 /**

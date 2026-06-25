@@ -1,5 +1,3 @@
-const SOURCE_MARKER = '__SOURCES_JSON__:';
-
 /**
  * 渲染助手 Markdown，并通过 DOMPurify 清理模型输出中的不可信 HTML。
  */
@@ -57,26 +55,9 @@ function renderSources(sources) {
 }
 
 /**
- * 解析流式响应：正文实时渲染，末尾的来源 JSON 单独显示为参考资料。
+ * 根据当前答案和来源列表刷新助手气泡。
  */
-function renderAssistantStream(bubble, rawStream) {
-    let answer = rawStream;
-    let sources = [];
-    const markerIndex = rawStream.indexOf(SOURCE_MARKER);
-
-    if (markerIndex >= 0) {
-        answer = rawStream.slice(0, markerIndex).trim();
-        const jsonText = rawStream.slice(markerIndex + SOURCE_MARKER.length).trim();
-
-        try {
-            const parsed = JSON.parse(jsonText);
-            sources = parsed.sources || [];
-        } catch (error) {
-            // 流还没完整到达时 JSON 可能暂时不完整，下一次 chunk 会重新解析。
-            sources = [];
-        }
-    }
-
+function renderAssistantMessage(bubble, answer, sources = []) {
     bubble.innerHTML = renderMarkdown(answer);
 
     const sourceBox = renderSources(sources);

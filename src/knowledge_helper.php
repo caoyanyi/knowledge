@@ -2,8 +2,6 @@
 
 require_once __DIR__ . '/app_helper.php';
 
-const STREAM_SOURCES_MARKER = '__SOURCES_JSON__:';
-
 /**
  * 将长文本切成适合向量化的片段，并保留少量重叠上下文。
  */

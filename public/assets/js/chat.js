@@ -40,9 +40,10 @@ async function sendMessage() {
         const decoder = new TextDecoder('utf-8');
 
         let answer = '';
-        let rawStream = '';
+        let streamBuffer = '';
+        let sources = [];
 
-        // 累积完整原始流，便于 renderAssistantStream 识别末尾来源标记。
+        // 后端按 NDJSON 输出事件；这里缓存半行数据，等换行到达后再解析。
         while (true) {
             const { value, done } = await reader.read();
 
@@ -51,10 +52,52 @@ async function sendMessage() {
             }
 
             const chunk = decoder.decode(value, { stream: true });
-            rawStream += chunk;
+            streamBuffer += chunk;
 
-            answer = renderAssistantStream(bubble, rawStream);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            const lines = streamBuffer.split('\n');
+            streamBuffer = lines.pop();
+
+            lines.forEach(line => {
+                if (!line.trim()) {
+                    return;
+                }
+
+                try {
+                    const event = JSON.parse(line);
+
+                    if (event.type === 'delta') {
+                        answer += event.text || '';
+                    } else if (event.type === 'sources') {
+                        sources = event.sources || [];
+                    } else if (event.type === 'error') {
+                        answer += `\n[模型错误] ${event.message || '未知错误'}`;
+                    }
+
+                    renderAssistantMessage(bubble, answer, sources);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                } catch (error) {
+                    answer += line;
+                    renderAssistantMessage(bubble, answer, sources);
+                }
+            });
+        }
+
+        if (streamBuffer.trim()) {
+            try {
+                const event = JSON.parse(streamBuffer);
+
+                if (event.type === 'delta') {
+                    answer += event.text || '';
+                } else if (event.type === 'sources') {
+                    sources = event.sources || [];
+                } else if (event.type === 'error') {
+                    answer += `\n[模型错误] ${event.message || '未知错误'}`;
+                }
+            } catch (error) {
+                answer += streamBuffer;
+            }
+
+            renderAssistantMessage(bubble, answer, sources);
         }
 
         if (!answer.trim()) {

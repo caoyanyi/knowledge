@@ -312,10 +312,12 @@ function callOpenAiResponse(array $env, array $payload): array
 /**
  * 调用流式模型接口，将每个文本增量交给回调实时输出。
  */
-function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): void
+function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): bool
 {
     $ch = curl_init(openAiResponsesEndpoint($env));
     $buffer = '';
+    $rawResponse = '';
+    $receivedDelta = false;
 
     // Responses API 使用 SSE；网络分片可能截断事件，所以先缓存到空行分隔符再解析。
     curl_setopt_array($ch, [
@@ -324,7 +326,8 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
         CURLOPT_HTTPHEADER => openAiRequestHeaders($env, true),
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
         CURLOPT_TIMEOUT => envInt($env, 'OPENAI_STREAM_TIMEOUT_SECONDS', 0, 0),
-        CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$buffer, $onTextDelta, $onError) {
+        CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$buffer, &$rawResponse, &$receivedDelta, $onTextDelta, $onError) {
+            $rawResponse .= $chunk;
             $buffer .= str_replace("\r\n", "\n", $chunk);
 
             while (($pos = strpos($buffer, "\n\n")) !== false) {
@@ -352,6 +355,7 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
                     }
 
                     if (($event['type'] ?? '') === 'response.output_text.delta') {
+                        $receivedDelta = true;
                         $onTextDelta((string) ($event['delta'] ?? ''));
                     } elseif (($event['type'] ?? '') === 'error' && $onError) {
                         $onError((string) ($event['message'] ?? '未知错误'));
@@ -364,6 +368,7 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
     ]);
 
     $result = curl_exec($ch);
+    $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
     if ($result === false) {
         $error = curl_error($ch);
@@ -372,6 +377,18 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
     }
 
     curl_close($ch);
+
+    if ($statusCode >= 400) {
+        if ($onError && envBool($env, 'OPENAI_STREAM_REPORT_UPSTREAM_ERROR', false)) {
+            $json = json_decode($rawResponse, true);
+            $message = $json['error']['message'] ?? $rawResponse;
+            $onError("HTTP {$statusCode}: {$message}");
+        }
+
+        return false;
+    }
+
+    return $receivedDelta;
 }
 
 /**
