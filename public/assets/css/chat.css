@@ -27,7 +27,6 @@
 
 .message {
   margin-bottom: 16px;
-  white-space: pre-wrap;
 }
 
 .user {
@@ -45,11 +44,14 @@
 .user .bubble {
   background: #2563eb;
   color: #fff;
+  white-space: pre-wrap;
 }
 
 .assistant .bubble {
   background: #fff;
   border: 1px solid #e5e7eb;
+  line-height: 1.55;
+  white-space: normal;
 }
 
 .input-area {
@@ -76,7 +78,7 @@
 }
 
 .assistant .bubble p {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 
 .assistant .bubble p:last-child {
@@ -85,14 +87,14 @@
 
 .assistant .bubble ul,
 .assistant .bubble ol {
-  margin: 8px 0;
-  padding-left: 22px;
+  margin: 6px 0;
+  padding-left: 20px;
 }
 
 .assistant .bubble h1,
 .assistant .bubble h2,
 .assistant .bubble h3 {
-  margin: 8px 0;
+  margin: 8px 0 6px;
 }
 
 .assistant .bubble code {
@@ -117,7 +119,7 @@
 }
 
 .assistant .bubble li {
-  margin: 4px 0;
+  margin: 2px 0;
 }
 
 .assistant .bubble li p {
@@ -154,8 +156,8 @@
 }
 
 .source-box {
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid #e5e7eb;
   font-size: 13px;
   color: #4b5563;
@@ -163,14 +165,14 @@
 }
 
 .source-title {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-weight: bold;
   color: #111827;
 }
 
 .source-item {
-  margin-bottom: 8px;
-  padding: 8px 10px;
+  margin-bottom: 6px;
+  padding: 7px 9px;
   border-radius: 6px;
   background: #f9fafb;
 }
@@ -183,6 +185,6 @@
 
 .source-item small {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   color: #6b7280;
 }
