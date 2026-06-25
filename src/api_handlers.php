@@ -35,7 +35,8 @@ function handleChatApi(): void
 function handleChatStreamApi(): void
 {
     header('Content-Type: application/x-ndjson; charset=utf-8');
-    header('Cache-Control: no-cache');
+    header('Cache-Control: no-cache, no-transform');
+    header('Connection: keep-alive');
     header('X-Accel-Buffering: no');
 
     set_time_limit(0);
@@ -70,10 +71,10 @@ function handleChatStreamApi(): void
         $knowledge = loadKnowledgeContextSafely($env, $message);
         $historyItems = loadChatHistorySafely($env, $pdo, $sessionId);
         $inputMessages = buildChatInputMessages($env, $message, $knowledge['context'], $historyItems);
-        $payload = buildResponsesPayload($env, $inputMessages, true);
+        $payload = buildChatCompletionsPayload($env, $inputMessages, true);
 
         // 文本增量用 NDJSON 事件输出，保证每个流片段都是可解析 JSON。
-        $receivedDelta = streamOpenAiResponse(
+        $receivedDelta = streamOpenAiChatCompletion(
             $env,
             $payload,
             function (string $delta) use (&$fullAnswer) {
@@ -127,6 +128,11 @@ function sendStreamEvent(string $type, array $payload = []): void
     echo json_encode(array_merge([
         'type' => $type,
     ], $payload), JSON_UNESCAPED_UNICODE) . "\n";
+
+    if (ob_get_level() > 0) {
+        ob_flush();
+    }
+
     flush();
 }
 

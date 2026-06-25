@@ -254,6 +254,16 @@ function openAiResponsesEndpoint(array $env): string
 }
 
 /**
+ * 获取 OpenAI-compatible Chat Completions API 地址。
+ */
+function openAiChatCompletionsEndpoint(array $env): string
+{
+    $baseUrl = envString($env, 'OPENAI_BASE_URL', 'https://api.openai.com');
+
+    return normalizeApiEndpoint($baseUrl, 'chat/completions');
+}
+
+/**
  * 构造模型请求头，流式请求时额外声明接收 SSE。
  */
 function openAiRequestHeaders(array $env, bool $stream = false): array
@@ -293,6 +303,31 @@ function buildResponsesPayload(array $env, array|string $input, bool $stream = f
 }
 
 /**
+ * 构造 Chat Completions 请求体，第三方 OpenAI-compatible 网关通常优先支持该流式协议。
+ */
+function buildChatCompletionsPayload(array $env, array $messages, bool $stream = false): array
+{
+    requireEnvKeys($env, ['OPENAI_API_KEY', 'OPENAI_MODEL']);
+
+    $payload = [
+        'model' => envString($env, 'OPENAI_MODEL'),
+        'messages' => array_merge([
+            [
+                'role' => 'system',
+                'content' => envString($env, 'OPENAI_INSTRUCTIONS', defaultAssistantInstructions()),
+            ],
+        ], $messages),
+        'max_tokens' => envInt($env, 'OPENAI_MAX_OUTPUT_TOKENS', 4096, 1),
+    ];
+
+    if ($stream) {
+        $payload['stream'] = true;
+    }
+
+    return $payload;
+}
+
+/**
  * 调用非流式模型接口，返回解析后的 JSON 数据。
  */
 function callOpenAiResponse(array $env, array $payload): array
@@ -310,20 +345,62 @@ function callOpenAiResponse(array $env, array $payload): array
 }
 
 /**
- * 调用流式模型接口，将每个文本增量交给回调实时输出。
+ * 解析 OpenAI SSE 数据块，将其中的文本增量转给调用方。
  */
-function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): bool
+function handleOpenAiStreamEvent(array $event, callable $onTextDelta, ?callable $onError = null): bool
 {
-    $ch = curl_init(openAiResponsesEndpoint($env));
+    if (($event['type'] ?? '') === 'response.output_text.delta') {
+        $onTextDelta((string) ($event['delta'] ?? ''));
+        return true;
+    }
+
+    $choiceDelta = $event['choices'][0]['delta'] ?? null;
+    if (is_array($choiceDelta) && array_key_exists('content', $choiceDelta)) {
+        $text = (string) ($choiceDelta['content'] ?? '');
+
+        if ($text !== '') {
+            $onTextDelta($text);
+            return true;
+        }
+    }
+
+    if (($event['type'] ?? '') === 'error' && $onError) {
+        $onError((string) ($event['message'] ?? '未知错误'));
+    }
+
+    if (isset($event['error']) && $onError) {
+        $message = is_array($event['error'])
+            ? (string) ($event['error']['message'] ?? '未知错误')
+            : (string) $event['error'];
+        $onError($message);
+    }
+
+    return false;
+}
+
+/**
+ * 调用 SSE 流式模型接口，将每个文本增量交给回调实时输出。
+ */
+function streamOpenAiSse(
+    array $env,
+    string $endpoint,
+    array $payload,
+    callable $onTextDelta,
+    ?callable $onError = null
+): bool
+{
+    $ch = curl_init($endpoint);
     $buffer = '';
     $rawResponse = '';
     $receivedDelta = false;
 
-    // Responses API 使用 SSE；网络分片可能截断事件，所以先缓存到空行分隔符再解析。
+    // SSE 网络分片可能截断事件，所以先缓存到空行分隔符再解析。
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => false,
-        CURLOPT_HTTPHEADER => openAiRequestHeaders($env, true),
+        CURLOPT_HTTPHEADER => array_merge(openAiRequestHeaders($env, true), [
+            'Content-Type: application/json',
+        ]),
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
         CURLOPT_TIMEOUT => envInt($env, 'OPENAI_STREAM_TIMEOUT_SECONDS', 0, 0),
         CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (&$buffer, &$rawResponse, &$receivedDelta, $onTextDelta, $onError) {
@@ -354,11 +431,8 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
                         continue;
                     }
 
-                    if (($event['type'] ?? '') === 'response.output_text.delta') {
+                    if (handleOpenAiStreamEvent($event, $onTextDelta, $onError)) {
                         $receivedDelta = true;
-                        $onTextDelta((string) ($event['delta'] ?? ''));
-                    } elseif (($event['type'] ?? '') === 'error' && $onError) {
-                        $onError((string) ($event['message'] ?? '未知错误'));
                     }
                 }
             }
@@ -389,6 +463,22 @@ function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta,
     }
 
     return $receivedDelta;
+}
+
+/**
+ * 调用 Responses API 流式接口。
+ */
+function streamOpenAiResponse(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): bool
+{
+    return streamOpenAiSse($env, openAiResponsesEndpoint($env), $payload, $onTextDelta, $onError);
+}
+
+/**
+ * 调用 Chat Completions API 流式接口。
+ */
+function streamOpenAiChatCompletion(array $env, array $payload, callable $onTextDelta, ?callable $onError = null): bool
+{
+    return streamOpenAiSse($env, openAiChatCompletionsEndpoint($env), $payload, $onTextDelta, $onError);
 }
 
 /**

@@ -3,6 +3,7 @@ const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 const STREAM_RENDER_INTERVAL_MS = 24;
 const STREAM_RENDER_CHUNK_SIZE = 2;
+const STREAM_DIRECT_RENDER_LIMIT = 8;
 
 /**
  * 创建前端打字机渲染器；即使后端降级为一次性 delta，也能逐步展示。
@@ -53,6 +54,12 @@ function createStreamRenderer(bubble) {
 
     return {
         append(text) {
+            if (pendingText === '' && text.length <= STREAM_DIRECT_RENDER_LIMIT) {
+                displayedAnswer += text;
+                render();
+                return;
+            }
+
             pendingText += text;
             startTimer();
         },
