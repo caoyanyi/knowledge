@@ -106,7 +106,7 @@ http://127.0.0.1:8000/knowledge_admin.html
 启动 Qdrant 后，创建集合：
 
 ```bash
-php qdrant_cli.php init
+php bin/qdrant_cli.php init
 ```
 
 默认 `QDRANT_VECTOR_SIZE=4096`。如果你的 Embedding 模型输出维度不是 4096，请先在 `.env` 中修改该值，再初始化集合。
@@ -114,7 +114,7 @@ php qdrant_cli.php init
 同步 MySQL 中的知识片段到 Qdrant：
 
 ```bash
-php qdrant_cli.php sync
+php bin/qdrant_cli.php sync
 ```
 
 ## 本地启动
@@ -143,16 +143,18 @@ http://127.0.0.1:8000
 
 ## 文件说明
 
-- `index.html`：聊天界面
-- `knowledge_admin.html`：知识库录入和同步页面
-- `script.js`：前端交互、流式读取、会话切换
-- `style.css`：页面样式
-- `app_helper.php`：环境读取、JSON 响应、PDO、OpenAI 请求等公共方法
-- `api.php`：统一 API 路由入口
-- `api_handlers.php`：API handler 实现
-- `knowledge_helper.php`：知识切片、Embedding、Qdrant、知识上下文构造等公共方法
 - `router.php`：PHP 内置服务器路由脚本
-- `qdrant_cli.php`：Qdrant 集合初始化和知识库同步脚本
+- `public/`：前端页面和静态资源
+- `public/index.html`：聊天界面
+- `public/knowledge_admin.html`：知识库录入和同步页面
+- `public/script.js`：前端交互、流式读取、会话切换
+- `public/style.css`：页面样式
+- `src/`：后端 API 和公共方法
+- `src/api.php`：统一 API 路由入口
+- `src/api_handlers.php`：API handler 实现
+- `src/app_helper.php`：环境读取、JSON 响应、PDO、OpenAI 请求等公共方法
+- `src/knowledge_helper.php`：知识切片、Embedding、Qdrant、知识上下文构造等公共方法
+- `bin/qdrant_cli.php`：Qdrant 集合初始化和知识库同步脚本
 
 ## 安全说明
 

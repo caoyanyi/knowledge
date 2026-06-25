@@ -2,7 +2,7 @@
 
 function loadEnv(?string $path = null): array
 {
-    $envPath = $path ?? __DIR__ . '/.env';
+    $envPath = $path ?? dirname(__DIR__) . '/.env';
 
     if (!file_exists($envPath)) {
         throw new RuntimeException('缺少 .env 配置文件');

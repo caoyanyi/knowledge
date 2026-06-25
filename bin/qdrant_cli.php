@@ -1,13 +1,13 @@
 <?php
 
-require_once __DIR__ . '/app_helper.php';
-require_once __DIR__ . '/knowledge_helper.php';
+require_once dirname(__DIR__) . '/src/app_helper.php';
+require_once dirname(__DIR__) . '/src/knowledge_helper.php';
 
 function printUsage(): void
 {
     echo "用法：\n";
-    echo "  php qdrant_cli.php init   创建或更新 Qdrant collection\n";
-    echo "  php qdrant_cli.php sync   将 MySQL 知识片段同步到 Qdrant\n";
+    echo "  php bin/qdrant_cli.php init   创建或更新 Qdrant collection\n";
+    echo "  php bin/qdrant_cli.php sync   将 MySQL 知识片段同步到 Qdrant\n";
 }
 
 function runQdrantInit(array $env): void
