@@ -41,15 +41,25 @@ function renderSources(sources) {
     const sourceBox = document.createElement('div');
     sourceBox.className = 'source-box';
 
-    sourceBox.innerHTML = DOMPurify.sanitize(`
-  <div class="source-title">参考资料</div>
-  ${sources.map(item => `
-    <div class="source-item">
-      <span>${item.title}</span>
-      <small>来源：${item.source || '知识库'} · 相关度：${item.score}</small>
-    </div>
-  `).join('')}
-`);
+    const title = document.createElement('div');
+    title.className = 'source-title';
+    title.textContent = '参考资料';
+    sourceBox.appendChild(title);
+
+    sources.forEach(item => {
+        const sourceItem = document.createElement('div');
+        sourceItem.className = 'source-item';
+
+        const sourceTitle = document.createElement('span');
+        sourceTitle.textContent = item.title;
+
+        const sourceMeta = document.createElement('small');
+        sourceMeta.textContent = `来源：${item.source || '知识库'} · 相关度：${item.score}`;
+
+        sourceItem.appendChild(sourceTitle);
+        sourceItem.appendChild(sourceMeta);
+        sourceBox.appendChild(sourceItem);
+    });
 
     return sourceBox;
 }
