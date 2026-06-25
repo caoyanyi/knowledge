@@ -8,6 +8,7 @@
 - 基于 Qdrant 的知识库向量检索
 - MySQL 保存会话和消息历史
 - 支持 OpenAI-compatible 聊天模型和 Embedding 模型
+- 前端通过统一 `/api/v1/*` API 请求后端
 - 提供知识库管理页、同步脚本和 Qdrant 集合初始化脚本
 
 ## 运行环境
@@ -121,7 +122,7 @@ php sync_knowledge_to_qdrant.php
 使用 PHP 内置服务器：
 
 ```bash
-php -S 127.0.0.1:8000
+php -S 127.0.0.1:8000 router.php
 ```
 
 然后打开：
@@ -130,6 +131,18 @@ php -S 127.0.0.1:8000
 http://127.0.0.1:8000
 ```
 
+## API 路由
+
+前端统一通过 API 路由访问后端，不直接请求具体 PHP 脚本：
+
+- `POST /api/v1/chat/stream`：流式问答
+- `POST /api/v1/chat`：非流式问答
+- `GET /api/v1/sessions`：会话列表
+- `GET /api/v1/sessions/{session_id}/messages`：会话消息
+- `POST /api/v1/knowledge-chunks`：保存知识并同步到 Qdrant
+
+`chat.php`、`chat_stream.php`、`sessions.php`、`session_messages.php`、`save_knowledge.php` 仍保留为兼容入口，新代码应优先使用 `/api/v1/*`。
+
 ## 文件说明
 
 - `index.html`：聊天界面
@@ -137,12 +150,11 @@ http://127.0.0.1:8000
 - `script.js`：前端交互、流式读取、会话切换
 - `style.css`：页面样式
 - `app_helper.php`：环境读取、JSON 响应、PDO、OpenAI 请求等公共方法
+- `api.php`：统一 API 路由入口
+- `api_handlers.php`：API handler 实现
 - `knowledge_helper.php`：知识切片、Embedding、Qdrant、知识上下文构造等公共方法
-- `chat_stream.php`：流式问答主接口，包含知识库检索和会话记录
-- `chat.php`：非流式问答接口
-- `save_knowledge.php`：保存知识内容并同步到 Qdrant
-- `sessions.php`：会话列表接口
-- `session_messages.php`：会话消息接口
+- `router.php`：PHP 内置服务器路由脚本
+- `chat_stream.php`、`chat.php`、`save_knowledge.php`、`sessions.php`、`session_messages.php`：旧路径兼容入口
 - `qdrant_init.php`：Qdrant 集合初始化脚本
 - `sync_knowledge_to_qdrant.php`：知识库向量同步脚本
 

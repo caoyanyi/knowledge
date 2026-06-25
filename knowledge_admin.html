@@ -119,7 +119,7 @@
       resultEl.textContent = '正在保存 MySQL，并同步 Qdrant...';
 
       try {
-        const response = await fetch('save_knowledge.php', {
+        const response = await fetch('/api/v1/knowledge-chunks', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

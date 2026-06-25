@@ -66,7 +66,7 @@ async function sendMessage() {
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
     try {
-        const response = await fetch('chat_stream.php', {
+        const response = await fetch('/api/v1/chat/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -152,7 +152,7 @@ async function sendMessage_all() {
     sendBtn.textContent = '请求中';
 
     try {
-        const response = await fetch('chat.php', {
+        const response = await fetch('/api/v1/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -216,7 +216,7 @@ newChatBtn.addEventListener('click', function () {
 });
 
 async function loadSessions() {
-    const response = await fetch('sessions.php');
+    const response = await fetch('/api/v1/sessions');
     const data = await response.json();
 
     if (!data.ok) return;
@@ -238,7 +238,7 @@ async function loadSessions() {
 }
 
 async function loadSessionMessages(targetSessionId) {
-    const response = await fetch('session_messages.php?session_id=' + encodeURIComponent(targetSessionId));
+    const response = await fetch('/api/v1/sessions/' + encodeURIComponent(targetSessionId) + '/messages');
     const data = await response.json();
 
     if (!data.ok) return;
