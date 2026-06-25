@@ -1,6 +1,7 @@
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
+const SOURCE_MARKER = '__SOURCES_JSON__:';
 
 function addMessage(role, text) {
     const wrapper = document.createElement('div');
@@ -18,6 +19,27 @@ function addMessage(role, text) {
     wrapper.appendChild(bubble);
     messagesEl.appendChild(wrapper);
     messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function renderSources(sources) {
+    if (sources.length === 0) {
+        return null;
+    }
+
+    const sourceBox = document.createElement('div');
+    sourceBox.className = 'source-box';
+
+    sourceBox.innerHTML = DOMPurify.sanitize(`
+  <div class="source-title">参考资料</div>
+  ${sources.map(item => `
+    <div class="source-item">
+      <span>${item.title}</span>
+      <small>来源：${item.source || '知识库'} · 相关度：${item.score}</small>
+    </div>
+  `).join('')}
+`);
+
+    return sourceBox;
 }
 
 async function sendMessage() {
@@ -77,13 +99,12 @@ async function sendMessage() {
             const chunk = decoder.decode(value, { stream: true });
             rawStream += chunk;
 
-            const marker = '__SOURCES_JSON__:';
-            const markerIndex = rawStream.indexOf(marker);
+            const markerIndex = rawStream.indexOf(SOURCE_MARKER);
 
             if (markerIndex >= 0) {
                 answer = rawStream.slice(0, markerIndex).trim();
 
-                const jsonText = rawStream.slice(markerIndex + marker.length).trim();
+                const jsonText = rawStream.slice(markerIndex + SOURCE_MARKER.length).trim();
 
                 try {
                     const parsed = JSON.parse(jsonText);
@@ -98,20 +119,8 @@ async function sendMessage() {
             const html = marked.parse(answer);
             bubble.innerHTML = DOMPurify.sanitize(html);
 
-            if (sources.length > 0) {
-                const sourceBox = document.createElement('div');
-                sourceBox.className = 'source-box';
-
-                sourceBox.innerHTML = DOMPurify.sanitize(`
-  <div class="source-title">参考资料</div>
-  ${sources.map(item => `
-    <div class="source-item">
-      <span>${item.title}</span>
-      <small>来源：${item.source || '知识库'} · 相关度：${item.score}</small>
-    </div>
-  `).join('')}
-`);
-
+            const sourceBox = renderSources(sources);
+            if (sourceBox) {
                 bubble.appendChild(sourceBox);
             }
 

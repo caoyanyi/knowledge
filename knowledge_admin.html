@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>知识库管理</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      background: #f5f6f8;
+      color: #111827;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 20px;
+      font-size: 22px;
+    }
+
+    label {
+      display: block;
+      margin: 16px 0 8px;
+      font-weight: bold;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 220px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    button {
+      margin-top: 16px;
+      padding: 10px 18px;
+      border: 0;
+      border-radius: 6px;
+      background: #111827;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+
+    .result {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      background: #f9fafb;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>知识库管理</h1>
+
+    <label>标题</label>
+    <input id="title" placeholder="例如：退款政策">
+
+    <label>来源</label>
+    <input id="source" placeholder="例如：售后政策手册 / 人工录入" value="后台录入">
+
+    <label>内容</label>
+    <textarea id="content" placeholder="请输入知识库内容"></textarea>
+
+    <button id="saveBtn">保存并同步到向量库</button>
+
+    <div id="result" class="result" style="display:none;"></div>
+  </div>
+
+  <script>
+    const titleEl = document.getElementById('title');
+    const sourceEl = document.getElementById('source');
+    const contentEl = document.getElementById('content');
+    const saveBtn = document.getElementById('saveBtn');
+    const resultEl = document.getElementById('result');
+
+    saveBtn.addEventListener('click', async function () {
+      const title = titleEl.value.trim();
+      const source = sourceEl.value.trim();
+      const content = contentEl.value.trim();
+
+      if (!title || !content) {
+        alert('标题和内容不能为空');
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = '保存中...';
+      resultEl.style.display = 'block';
+      resultEl.textContent = '正在保存 MySQL，并同步 Qdrant...';
+
+      try {
+        const response = await fetch('save_knowledge.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title,
+            source,
+            content
+          })
+        });
+
+        const data = await response.json();
+        resultEl.textContent = JSON.stringify(data, null, 2);
+
+        if (data.ok) {
+          titleEl.value = '';
+          contentEl.value = '';
+        }
+      } catch (error) {
+        resultEl.textContent = '请求失败：' + error.message;
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '保存并同步到向量库';
+      }
+    });
+  </script>
+</body>
+</html>
