@@ -1,6 +1,90 @@
 const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
+const STREAM_RENDER_INTERVAL_MS = 24;
+const STREAM_RENDER_CHUNK_SIZE = 2;
+
+/**
+ * 创建前端打字机渲染器；即使后端降级为一次性 delta，也能逐步展示。
+ */
+function createStreamRenderer(bubble) {
+    let displayedAnswer = '';
+    let pendingText = '';
+    let sources = [];
+    let timerId = null;
+    let resolveIdle = null;
+
+    function render() {
+        renderAssistantMessage(bubble, displayedAnswer, sources);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function stopTimerIfIdle() {
+        if (pendingText !== '' || !timerId) {
+            return;
+        }
+
+        clearInterval(timerId);
+        timerId = null;
+
+        if (resolveIdle) {
+            resolveIdle();
+            resolveIdle = null;
+        }
+    }
+
+    function tick() {
+        if (pendingText === '') {
+            stopTimerIfIdle();
+            return;
+        }
+
+        displayedAnswer += pendingText.slice(0, STREAM_RENDER_CHUNK_SIZE);
+        pendingText = pendingText.slice(STREAM_RENDER_CHUNK_SIZE);
+        render();
+        stopTimerIfIdle();
+    }
+
+    function startTimer() {
+        if (!timerId) {
+            timerId = setInterval(tick, STREAM_RENDER_INTERVAL_MS);
+        }
+    }
+
+    return {
+        append(text) {
+            pendingText += text;
+            startTimer();
+        },
+
+        setSources(nextSources, shouldRender = true) {
+            sources = nextSources;
+
+            if (shouldRender) {
+                render();
+            }
+        },
+
+        renderNow() {
+            render();
+        },
+
+        waitUntilIdle() {
+            if (pendingText === '') {
+                return Promise.resolve();
+            }
+
+            return new Promise(resolve => {
+                resolveIdle = resolve;
+                startTimer();
+            });
+        },
+
+        getAnswer() {
+            return displayedAnswer + pendingText;
+        }
+    };
+}
 
 /**
  * 发送当前输入内容，并用流式响应持续更新助手消息气泡。
@@ -39,9 +123,8 @@ async function sendMessage() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
 
-        let answer = '';
         let streamBuffer = '';
-        let sources = [];
+        const streamRenderer = createStreamRenderer(bubble);
 
         // 后端按 NDJSON 输出事件；这里缓存半行数据，等换行到达后再解析。
         while (true) {
@@ -66,18 +149,14 @@ async function sendMessage() {
                     const event = JSON.parse(line);
 
                     if (event.type === 'delta') {
-                        answer += event.text || '';
+                        streamRenderer.append(event.text || '');
                     } else if (event.type === 'sources') {
-                        sources = event.sources || [];
+                        streamRenderer.setSources(event.sources || [], false);
                     } else if (event.type === 'error') {
-                        answer += `\n[模型错误] ${event.message || '未知错误'}`;
+                        streamRenderer.append(`\n[模型错误] ${event.message || '未知错误'}`);
                     }
-
-                    renderAssistantMessage(bubble, answer, sources);
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
                 } catch (error) {
-                    answer += line;
-                    renderAssistantMessage(bubble, answer, sources);
+                    streamRenderer.append(line);
                 }
             });
         }
@@ -87,20 +166,21 @@ async function sendMessage() {
                 const event = JSON.parse(streamBuffer);
 
                 if (event.type === 'delta') {
-                    answer += event.text || '';
+                    streamRenderer.append(event.text || '');
                 } else if (event.type === 'sources') {
-                    sources = event.sources || [];
+                    streamRenderer.setSources(event.sources || [], false);
                 } else if (event.type === 'error') {
-                    answer += `\n[模型错误] ${event.message || '未知错误'}`;
+                    streamRenderer.append(`\n[模型错误] ${event.message || '未知错误'}`);
                 }
             } catch (error) {
-                answer += streamBuffer;
+                streamRenderer.append(streamBuffer);
             }
-
-            renderAssistantMessage(bubble, answer, sources);
         }
 
-        if (!answer.trim()) {
+        await streamRenderer.waitUntilIdle();
+        streamRenderer.renderNow();
+
+        if (!streamRenderer.getAnswer().trim()) {
             bubble.textContent = '模型没有返回内容';
         }
     } catch (error) {
