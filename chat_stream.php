@@ -96,7 +96,11 @@ if ($message !== '') {
             $knowledgeContext .= "{$chunk['content']}\n";
             $knowledgeContext .= "来源：{$chunk['source']}\n\n";
 
-            $knowledgeSources[] = $chunk['title'];
+            $knowledgeSources[] = [
+                'title' => $chunk['title'],
+                'source' => $chunk['source'],
+                'score' => round((float) $chunk['score'], 4),
+            ];
         }
     } catch (Throwable $e) {
         $knowledgeContext = '';
