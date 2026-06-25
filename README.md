@@ -106,7 +106,7 @@ http://127.0.0.1:8000/knowledge_admin.html
 启动 Qdrant 后，创建集合：
 
 ```bash
-php qdrant_init.php
+php qdrant_cli.php init
 ```
 
 默认 `QDRANT_VECTOR_SIZE=4096`。如果你的 Embedding 模型输出维度不是 4096，请先在 `.env` 中修改该值，再初始化集合。
@@ -114,7 +114,7 @@ php qdrant_init.php
 同步 MySQL 中的知识片段到 Qdrant：
 
 ```bash
-php sync_knowledge_to_qdrant.php
+php qdrant_cli.php sync
 ```
 
 ## 本地启动
@@ -141,8 +141,6 @@ http://127.0.0.1:8000
 - `GET /api/v1/sessions/{session_id}/messages`：会话消息
 - `POST /api/v1/knowledge-chunks`：保存知识并同步到 Qdrant
 
-`chat.php`、`chat_stream.php`、`sessions.php`、`session_messages.php`、`save_knowledge.php` 仍保留为兼容入口，新代码应优先使用 `/api/v1/*`。
-
 ## 文件说明
 
 - `index.html`：聊天界面
@@ -154,9 +152,7 @@ http://127.0.0.1:8000
 - `api_handlers.php`：API handler 实现
 - `knowledge_helper.php`：知识切片、Embedding、Qdrant、知识上下文构造等公共方法
 - `router.php`：PHP 内置服务器路由脚本
-- `chat_stream.php`、`chat.php`、`save_knowledge.php`、`sessions.php`、`session_messages.php`：旧路径兼容入口
-- `qdrant_init.php`：Qdrant 集合初始化脚本
-- `sync_knowledge_to_qdrant.php`：知识库向量同步脚本
+- `qdrant_cli.php`：Qdrant 集合初始化和知识库同步脚本
 
 ## 安全说明
 
