@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>企业 AI 知识库客服</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <span>企业 AI 知识库客服</span>
+      <button id="newChatBtn" class="small-btn">新会话</button>
+    </div>
+
+    <div id="sessionList" class="session-list"></div>
+
+    <div id="messages" class="messages">
+      <div class="message assistant">
+        <div class="bubble">你好，我是企业 AI 知识库客服助手。你可以先问我一个企业客服相关的问题。</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="messageInput" placeholder="请输入你的问题"></textarea>
+      <button id="sendBtn">发送</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>

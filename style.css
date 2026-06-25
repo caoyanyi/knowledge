@@ -1,0 +1,179 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  background: #f5f6f8;
+  color: #222;
+}
+
+.app {
+  width: 720px;
+  max-width: 100%;
+  margin: 40px auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.messages {
+  height: 480px;
+  padding: 20px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.message {
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+}
+
+.user {
+  text-align: right;
+}
+
+.bubble {
+  display: inline-block;
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.user .bubble {
+  background: #2563eb;
+  color: #fff;
+}
+
+.assistant .bubble {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+}
+
+.input-area {
+  display: flex;
+  gap: 10px;
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+textarea {
+  flex: 1;
+  height: 48px;
+  resize: none;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 15px;
+  outline: none;
+}
+
+button {
+  width: 96px;
+  border: 0;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.assistant .bubble p {
+  margin: 0 0 8px;
+}
+
+.assistant .bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant .bubble ul,
+.assistant .bubble ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.assistant .bubble h1,
+.assistant .bubble h2,
+.assistant .bubble h3 {
+  margin: 8px 0;
+}
+
+.assistant .bubble code {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  font-family: Consolas, Monaco, monospace;
+}
+
+.assistant .bubble pre {
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: #111827;
+  color: #f9fafb;
+}
+
+.assistant .bubble pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.assistant .bubble li {
+  margin: 4px 0;
+}
+
+.assistant .bubble li p {
+  margin: 0;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.small-btn {
+  width: 80px;
+  height: 32px;
+  font-size: 14px;
+}
+
+.session-list {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.session-item {
+  flex: 0 0 auto;
+  max-width: 180px;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
