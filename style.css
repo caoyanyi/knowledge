@@ -177,3 +177,36 @@ button:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.source-box {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.source-title {
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #111827;
+}
+
+.source-item {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.source-item span {
+  display: block;
+  font-weight: 500;
+  color: #111827;
+}
+
+.source-item small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7280;
+}
