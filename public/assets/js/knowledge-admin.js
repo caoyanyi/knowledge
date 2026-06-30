@@ -6,6 +6,12 @@ const resultEl = document.getElementById('result');
 const refreshBtn = document.getElementById('refreshBtn');
 const syncBtn = document.getElementById('syncBtn');
 const chunkListEl = document.getElementById('chunkList');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
+const fileTitleEl = document.getElementById('fileTitle');
+const knowledgeFileEl = document.getElementById('knowledgeFile');
+const uploadBtn = document.getElementById('uploadBtn');
+
+let editingId = null;
 
 /**
  * 在结果区域展示接口返回，便于后台操作后直接排查错误信息。
@@ -41,6 +47,14 @@ function renderKnowledgeChunks(items) {
         const title = document.createElement('strong');
         title.textContent = `#${item.id} ${item.title || '未命名片段'}`;
 
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'edit-btn';
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', function () {
+            editKnowledgeChunk(item.id);
+        });
+
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'delete-btn';
@@ -48,6 +62,12 @@ function renderKnowledgeChunks(items) {
         deleteBtn.addEventListener('click', function () {
             deleteKnowledgeChunk(item.id);
         });
+
+        const operator = document.createElement('div');
+        operator.className = 'chunk-operator';
+        operator.appendChild(editBtn);
+        operator.appendChild(deleteBtn);
+        header.appendChild(operator);
 
         const meta = document.createElement('div');
         meta.className = 'chunk-meta';
@@ -58,7 +78,7 @@ function renderKnowledgeChunks(items) {
         preview.textContent = item.preview || '';
 
         header.appendChild(title);
-        header.appendChild(deleteBtn);
+        header.appendChild(operator);
         row.appendChild(header);
         row.appendChild(meta);
         row.appendChild(preview);
@@ -85,6 +105,37 @@ async function loadKnowledgeChunks() {
         chunkListEl.textContent = '请求失败：' + error.message;
     }
 }
+
+async function editKnowledgeChunk(id) {
+    const data = await ApiClient.getKnowledgeChunk(id);
+
+    if (!data.ok) {
+        alert(data.error || '读取失败');
+        return;
+    }
+
+    editingId = id;
+
+    titleEl.value = data.item.title || '';
+    sourceEl.value = data.item.source || '';
+    contentEl.value = data.item.content || '';
+
+    saveBtn.textContent = '更新并同步';
+    cancelEditBtn.style.display = 'inline-block';
+
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+cancelEditKnowledgeChunk = function () {
+    titleEl.value = '';
+    contentEl.value = '';
+    editingId = null;
+    saveBtn.textContent = '保存';
+    cancelEditBtn.style.display = 'none';
+};
 
 /**
  * 删除单条知识片段，后端会同时清理 MySQL 和 Qdrant。
@@ -147,29 +198,73 @@ async function saveKnowledgeChunk() {
     showResult('正在保存 MySQL，并同步 Qdrant...');
 
     try {
-        const data = await ApiClient.createKnowledgeChunk({
-            title,
-            source,
-            content
-        });
+        const data = editingId
+            ? await ApiClient.updateKnowledgeChunk(editingId, { title, source, content })
+            : await ApiClient.createKnowledgeChunk({ title, source, content });
 
         showResult(data);
 
         if (data.ok) {
             titleEl.value = '';
             contentEl.value = '';
-            loadKnowledgeChunks();
+            editingId = null;
+            saveBtn.textContent = '保存';
+            cancelEditBtn.style.display = 'none';
+
+            if (typeof loadKnowledgeChunks === 'function') {
+                loadKnowledgeChunks();
+            }
         }
     } catch (error) {
         showResult('请求失败：' + error.message);
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = '保存并同步到向量库';
+        saveBtn.textContent = '保存';
     }
 }
+
+uploadBtn.addEventListener('click', async function () {
+  const file = knowledgeFileEl.files[0];
+
+  if (!file) {
+    alert('请选择文件');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', fileTitleEl.value.trim());
+
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = '上传中...';
+
+  resultEl.style.display = 'block';
+  resultEl.textContent = '正在上传文件、切分内容、同步向量库...';
+
+  try {
+    const data = await ApiClient.uploadKnowledgeFile(formData);
+    resultEl.textContent = JSON.stringify(data, null, 2);
+
+    if (data.ok) {
+      fileTitleEl.value = '';
+      knowledgeFileEl.value = '';
+
+      if (typeof loadKnowledgeChunks === 'function') {
+        loadKnowledgeChunks();
+      }
+    }
+  } catch (error) {
+    resultEl.textContent = '上传失败：' + error.message;
+  } finally {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = '上传并同步';
+  }
+});
+
 
 saveBtn.addEventListener('click', saveKnowledgeChunk);
 refreshBtn.addEventListener('click', loadKnowledgeChunks);
 syncBtn.addEventListener('click', syncKnowledgeChunks);
+cancelEditBtn.addEventListener('click', cancelEditKnowledgeChunk);
 
 loadKnowledgeChunks();

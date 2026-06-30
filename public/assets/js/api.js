@@ -68,5 +68,24 @@ const ApiClient = {
 
     syncKnowledgeChunks() {
         return this.postJson('/api/v1/knowledge-chunks/sync', {});
+    },
+    uploadKnowledgeFile(formData) {
+        return fetch('/api/v1/knowledge-files', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json());
+    },
+    getKnowledgeChunk(id) {
+        return this.getJson('/api/v1/knowledge-chunks/' + encodeURIComponent(id));
+    },
+
+    updateKnowledgeChunk(id, payload) {
+        return fetch('/api/v1/knowledge-chunks/' + encodeURIComponent(id), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        }).then(response => response.json());
     }
 };

@@ -7,29 +7,85 @@
   <link rel="stylesheet" href="/assets/css/admin.css" />
 </head>
 <body>
-  <div class="page">
-    <h1>知识库管理</h1>
+  <main class="admin-shell">
+    <header class="admin-hero">
+      <div>
+        <div class="eyebrow">Knowledge Base</div>
+        <h1>知识库管理</h1>
+        <p>维护客服知识片段，支持手动录入、文件上传和向量库同步。</p>
+      </div>
+      <a class="back-link" href="/">返回客服台</a>
+    </header>
 
-    <label>标题</label>
-    <input id="title" placeholder="例如：退款政策">
+    <div class="admin-grid">
+      <section class="page admin-card" aria-labelledby="entryTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="entryTitle">知识录入</h2>
+            <p>保存后会写入知识库并同步到 Qdrant。</p>
+          </div>
+        </div>
 
-    <label>来源</label>
-    <input id="source" placeholder="例如：售后政策手册 / 人工录入" value="后台录入">
+        <div class="form-field">
+          <label for="title">标题</label>
+          <input id="title" placeholder="例如：退款政策">
+        </div>
 
-    <label>内容</label>
-    <textarea id="content" placeholder="请输入知识库内容"></textarea>
+        <div class="form-field">
+          <label for="source">来源</label>
+          <input id="source" placeholder="例如：售后政策手册 / 人工录入" value="后台录入">
+        </div>
 
-    <button id="saveBtn">保存并同步到向量库</button>
+        <div class="form-field">
+          <label for="content">内容</label>
+          <textarea id="content" placeholder="请输入知识库内容"></textarea>
+        </div>
 
-    <div id="result" class="result" style="display:none;"></div>
-  </div>
+        <div class="form-actions">
+          <button id="saveBtn">保存</button>
+          <button id="cancelEditBtn" type="button" style="display:none;">取消编辑</button>
+        </div>
 
-  <div class="admin-toolbar">
-    <button id="refreshBtn" type="button">刷新列表</button>
-    <button id="syncBtn" type="button">重新同步 Qdrant</button>
-  </div>
+        <div id="result" class="result" style="display:none;"></div>
+      </section>
 
-  <div id="chunkList" class="chunk-list"></div>
+      <section class="upload-panel admin-card" aria-labelledby="uploadTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="uploadTitle">文件上传</h2>
+            <p>支持 TXT 和 Markdown 文件。</p>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="fileTitle">文件标题，可选</label>
+          <input id="fileTitle" placeholder="不填则使用文件名">
+        </div>
+
+        <div class="form-field">
+          <label for="knowledgeFile">选择文件</label>
+          <input id="knowledgeFile" type="file" accept=".txt,.md">
+        </div>
+
+        <button id="uploadBtn" type="button">上传并同步</button>
+      </section>
+    </div>
+
+    <section class="list-panel" aria-labelledby="chunkListTitle">
+      <div class="list-header">
+        <div>
+          <h2 id="chunkListTitle">知识片段</h2>
+          <p>查看、编辑和删除已入库的内容。</p>
+        </div>
+        <div class="admin-toolbar">
+          <button id="refreshBtn" type="button">刷新列表</button>
+          <button id="syncBtn" type="button">重新同步 Qdrant</button>
+        </div>
+      </div>
+
+      <div id="chunkList" class="chunk-list"></div>
+    </section>
+  </main>
 
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/knowledge-admin.js"></script>

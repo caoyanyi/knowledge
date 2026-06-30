@@ -1,6 +1,7 @@
 <?php
 
 // PHP 内置服务器入口：手动处理 public 静态资源和 /api 请求。
+set_time_limit(0);
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $publicRoot = __DIR__ . '/public';
 $filePath = $path === '/'

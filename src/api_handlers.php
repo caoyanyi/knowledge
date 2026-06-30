@@ -473,3 +473,201 @@ function handleSyncKnowledgeChunksApi(): void
         sendJsonError($e->getMessage(), 500);
     }
 }
+
+/**
+ * 上传知识文件到知识库。
+ */
+function handleUploadKnowledgeFileApi(): void
+{
+    try {
+        $env = loadEnv();
+
+        if (!isset($_FILES['file'])) {
+            sendJsonError('请上传文件', 400);
+            return;
+        }
+
+        $file = $_FILES['file'];
+
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            sendJsonError('文件上传失败', 400);
+            return;
+        }
+
+        $originalName = $file['name'] ?? '';
+        $tmpPath = $file['tmp_name'] ?? '';
+
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if (!in_array($ext, ['txt', 'md'], true)) {
+            sendJsonError('当前仅支持 txt 和 md 文件', 400);
+            return;
+        }
+
+        $maxBytes = envInt($env, 'KNOWLEDGE_UPLOAD_MAX_BYTES', 1024 * 1024 * 2, 1);
+
+        if (($file['size'] ?? 0) > $maxBytes) {
+            sendJsonError('文件过大，请控制在 2MB 以内', 400);
+            return;
+        }
+
+        $content = file_get_contents($tmpPath);
+
+        if ($content === false || trim($content) === '') {
+            sendJsonError('文件内容为空', 400);
+            return;
+        }
+
+        $title = trim($_POST['title'] ?? '');
+
+        if ($title === '') {
+            $title = pathinfo($originalName, PATHINFO_FILENAME);
+        }
+
+        $source = '文件上传：' . $originalName;
+
+        $chunks = splitTextIntoChunks(
+            $content,
+            envInt($env, 'KNOWLEDGE_CHUNK_MAX_LENGTH', 800, 1),
+            envInt($env, 'KNOWLEDGE_CHUNK_OVERLAP', 100, 0)
+        );
+
+        if (!$chunks) {
+            sendJsonError('文件切分失败', 400);
+            return;
+        }
+
+        $pdo = createPdo($env);
+        $pdo->beginTransaction();
+
+        $result = saveKnowledgeChunks($env, $pdo, $title, $source, $chunks);
+
+        $pdo->commit();
+
+        sendJson([
+            'ok' => true,
+            'filename' => $originalName,
+            'ids' => $result['ids'],
+            'chunk_count' => count($chunks),
+            'message' => '文件上传并同步成功',
+        ]);
+    } catch (Throwable $e) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        sendJsonError($e->getMessage(), 500);
+    }
+}
+
+
+function handleGetKnowledgeChunkApi(int $id): void
+{
+    try {
+        if ($id <= 0) {
+            sendJsonError('id 不合法', 400);
+            return;
+        }
+
+        $env = loadEnv();
+        $pdo = createPdo($env);
+
+        $stmt = $pdo->prepare("
+            SELECT id, title, content, source, created_at
+            FROM knowledge_chunks
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+        $stmt->execute([':id' => $id]);
+
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            sendJsonError('知识片段不存在', 404);
+            return;
+        }
+
+        sendJson([
+            'ok' => true,
+            'item' => $row,
+        ]);
+    } catch (Throwable $e) {
+        sendJsonError($e->getMessage(), 500);
+    }
+}
+
+function handleUpdateKnowledgeChunkApi(int $id): void
+{
+    try {
+        if ($id <= 0) {
+            sendJsonError('id 不合法', 400);
+            return;
+        }
+
+        $env = loadEnv();
+        $body = readJsonBody();
+
+        $title = trim($body['title'] ?? '');
+        $content = trim($body['content'] ?? '');
+        $source = trim($body['source'] ?? '');
+
+        if ($title === '' || $content === '') {
+            sendJsonError('标题和内容不能为空', 400);
+            return;
+        }
+
+        $pdo = createPdo($env);
+        $pdo->beginTransaction();
+
+        $stmt = $pdo->prepare("
+            SELECT id
+            FROM knowledge_chunks
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+        $stmt->execute([':id' => $id]);
+
+        if (!$stmt->fetch()) {
+            $pdo->rollBack();
+            sendJsonError('知识片段不存在', 404);
+            return;
+        }
+
+        $updateStmt = $pdo->prepare("
+            UPDATE knowledge_chunks
+            SET title = :title,
+                content = :content,
+                source = :source
+            WHERE id = :id
+        ");
+
+        $updateStmt->execute([
+            ':id' => $id,
+            ':title' => $title,
+            ':content' => $content,
+            ':source' => $source,
+        ]);
+
+        $vector = createEmbedding($env, $title . "\n" . $content);
+
+        upsertQdrantPoints($env, [
+            buildKnowledgePoint($id, $title, $content, $source, $vector),
+        ]);
+
+        $pdo->commit();
+
+        sendJson([
+            'ok' => true,
+            'id' => $id,
+            'message' => '知识片段已更新并同步到 Qdrant',
+        ]);
+    } catch (Throwable $e) {
+        if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        sendJsonError($e->getMessage(), 500);
+    }
+}

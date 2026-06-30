@@ -44,7 +44,7 @@ $path = apiPath();
 
 if ($method === 'OPTIONS') {
     // 预检请求不进入业务处理，方便未来从其他前端域名调用。
-    header('Allow: GET, POST, OPTIONS');
+    header('Allow: GET, POST, PUT, DELETE, OPTIONS');
     http_response_code(204);
     exit;
 }
@@ -85,8 +85,21 @@ if ($path === '/v1/knowledge-chunks/sync') {
     exit;
 }
 
+if ($path === '/v1/knowledge-files') {
+    $method === 'POST' ? handleUploadKnowledgeFileApi() : sendApiMethodNotAllowed(['POST']);
+    exit;
+}
+
 if (preg_match('#^/v1/knowledge-chunks/(\d+)$#', $path, $matches)) {
-    $method === 'DELETE' ? handleDeleteKnowledgeChunkApi((int) $matches[1]) : sendApiMethodNotAllowed(['DELETE']);
+    if ($method === 'GET') {
+        handleGetKnowledgeChunkApi((int) $matches[1]);
+    } elseif ($method === 'PUT') {
+        handleUpdateKnowledgeChunkApi((int) $matches[1]);
+    } elseif ($method === 'DELETE') {
+        handleDeleteKnowledgeChunkApi((int) $matches[1]);
+    } else {
+        sendApiMethodNotAllowed(['GET', 'PUT', 'DELETE']);
+    }
     exit;
 }
 

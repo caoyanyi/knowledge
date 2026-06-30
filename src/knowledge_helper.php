@@ -168,7 +168,7 @@ function upsertQdrantPoints(array $env, array $points): array
 /**
  * 根据用户问题检索最相关的知识片段。
  */
-function searchKnowledgeByVector(array $env, string $query, ?int $limit = null): array
+function searchKnowledgeByVector(array $env, string $query, ?int $limit = null, bool $useScoreThreshold = true): array
 {
     $limit = $limit ?? envInt($env, 'KNOWLEDGE_SEARCH_LIMIT', 3, 1);
     $vector = createEmbedding($env, $query);
@@ -181,7 +181,7 @@ function searchKnowledgeByVector(array $env, string $query, ?int $limit = null):
 
     $scoreThreshold = envFloat($env, 'QDRANT_SCORE_THRESHOLD', 0.45, 0.0);
 
-    if ($scoreThreshold > 0) {
+    if ($useScoreThreshold && $scoreThreshold > 0) {
         $payload['score_threshold'] = $scoreThreshold;
     }
 
@@ -255,16 +255,29 @@ function filterStrongRelatedChunks(array $chunks, string $message): array
  */
 function buildKnowledgeContext(array $env, string $message): array
 {
-    $chunks = searchKnowledgeByVector($env, $message);
+    $limit = envInt($env, 'KNOWLEDGE_SEARCH_LIMIT', 3, 1);
+    $candidateLimit = envInt($env, 'KNOWLEDGE_SEARCH_CANDIDATE_LIMIT', 8, 1);
 
-    if (envBool($env, 'KNOWLEDGE_STRICT_TERM_FILTER', false)) {
+    $chunks = searchKnowledgeByVector($env, $message, $candidateLimit, false);
+
+    $requiredTerms = getRequiredTerms($message);
+
+    if ($requiredTerms) {
         $chunks = filterStrongRelatedChunks($chunks, $message);
+        $scoreThreshold = envFloat($env, 'QDRANT_STRICT_TERM_SCORE_THRESHOLD', 0.30, 0.0);
+    } else {
+        $scoreThreshold = envFloat($env, 'QDRANT_SCORE_THRESHOLD', 0.45, 0.0);
     }
+
+    $chunks = array_values(array_filter($chunks, function ($chunk) use ($scoreThreshold) {
+        return (float) ($chunk['score'] ?? 0) >= $scoreThreshold;
+    }));
+
+    $chunks = array_slice($chunks, 0, $limit);
 
     $context = '';
     $sources = [];
 
-    // 同一份召回结果同时服务提示词和前端“参考资料”，避免重复检索。
     foreach ($chunks as $index => $chunk) {
         $num = $index + 1;
         $score = number_format((float) $chunk['score'], 4);
